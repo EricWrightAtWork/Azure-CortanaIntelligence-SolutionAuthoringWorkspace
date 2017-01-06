@@ -36,8 +36,7 @@
     <Reference Include="Microsoft.WindowsAzure.Storage">
       <HintPath>..\..\NugetPackages\WindowsAzure.Storage.7.2.1\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
     </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.configuration" />
+    <Reference Include="System" />    
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -47,8 +46,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="InformationPrinter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">

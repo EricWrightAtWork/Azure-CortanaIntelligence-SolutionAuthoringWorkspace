@@ -36,15 +36,23 @@
     <StartupObject />
   </PropertyGroup>
   <PropertyGroup>
-    <AssemblyName>Micosoft.Ciqs.Saw.Common</AssemblyName>
+    <AssemblyName>Microsoft.Ciqs.Saw.Common</AssemblyName>
   </PropertyGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
-    <Compile Include="SawPhaseAttribute.cs" />
-    <Compile Include="ISawPhase.cs" />
+    <Compile Include="Constants.cs" />
     <Compile Include="SawException.cs" />
     <Compile Include="CommandLineArgumentsParser.cs" />
-    <Compile Include="ParameterAttribute.cs" />
+    <Compile Include="Phases\IPhase.cs" />    
+    <Compile Include="Phases\PhaseListProvider.cs" />
+    <Compile Include="Phases\ParameterAttribute.cs" />
+    <Compile Include="Phases\ParameterDescriptor.cs" />
+    <Compile Include="Phases\PhaseAttribute.cs" />
+    <Compile Include="Phases\PhaseDescriptor.cs" />
+    <Compile Include="Phases\SawPhaseException.cs" />
+    <Compile Include="Phases\PhaseSequenceExecutor.cs" />
+    <Compile Include="Utilities\IEnumerableExtensions.cs" />
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
   </ItemGroup>
 </Project>

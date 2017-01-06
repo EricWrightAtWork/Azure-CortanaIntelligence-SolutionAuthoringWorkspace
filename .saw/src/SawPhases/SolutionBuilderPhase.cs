@@ -9,14 +9,14 @@ namespace Microsoft.Ciqs.Saw.Phases
     using System.Threading.Tasks;
     using Microsoft.Ciqs.Saw.Common;
 
-    [SawPhase("build")]
-    public class SolutionBuilderPhase : ISawPhase
+    [Phase("build", "build solution artifacts from source code")]
+    public class SolutionBuilderPhase : IPhase
     {
-        [Parameter]
+        [Parameter("path to the directory containing solutions")]
         public string SolutionsDirectory { get; set; }
-        [Parameter]
+        [Parameter("NuGet packages directory")]
         public string PackagesDirectory { get; set; }
-        [Parameter(Required=false)]
+        [Parameter("solution(s) to act upon", Required=false)]
         public string[] Solutions { get; set; }
 
         private Action<int, string> defaultExitAction = 
@@ -34,28 +34,32 @@ namespace Microsoft.Ciqs.Saw.Phases
             };
         
         private const string sourceDirectoryName = "src";
-
-        public SolutionBuilderPhase(string path, string packagesDirectory)
-        {
-            if (!path.EndsWith(Path.DirectorySeparatorChar.ToString()))
-            {
-                path += Path.DirectorySeparatorChar;
-            }
-
-            this.SolutionsDirectory = path;
-            this.PackagesDirectory = packagesDirectory;
-        }
-        
+                
         public void Run()
         {
+            var solutionsRoot = this.SolutionsDirectory;
             
-        }
-
-        public void Build()
-        {
-            foreach (string solutionRoot in Directory.GetDirectories(this.SolutionsDirectory))
+            if (!solutionsRoot.EndsWith(Path.DirectorySeparatorChar.ToString()))
             {
-                var solutionName = solutionRoot.Remove(0, SolutionsDirectory.Length);
+                solutionsRoot += Path.DirectorySeparatorChar;
+            }
+            
+            var solutionSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            
+            if (this.Solutions != null)
+            {
+                solutionSet.UnionWith(this.Solutions);
+            }
+
+            foreach (string solutionRoot in Directory.GetDirectories(solutionsRoot))
+            {
+                var solutionName = solutionRoot.Remove(0, solutionsRoot.Length).ToLower();
+                
+                if (this.Solutions != null && !solutionSet.Contains(solutionName))
+                {
+                    continue;
+                }
+                
                 var solutionSrc = Path.Combine(solutionRoot, SolutionBuilderPhase.sourceDirectoryName);
                 Console.WriteLine($"Building {solutionName}...");
                 

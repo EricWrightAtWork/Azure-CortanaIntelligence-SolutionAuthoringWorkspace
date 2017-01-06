@@ -10,34 +10,28 @@ namespace Microsoft.Ciqs.Saw.Phases
     using Microsoft.WindowsAzure.Storage;
     using Microsoft.WindowsAzure.Storage.Blob;
 
-    [SawPhase("deploy", Dependencies="build")]
-    public class SolutionDeployerPhase : ISawPhase
+    [Phase("deploy", "deploy solution(s) into Azure Storage account (CIQS)", Dependencies="build")]
+    public class SolutionDeployerPhase : IPhase
     {
-        private string path;
-
         private CloudBlobClient client;
 
-        public SolutionDeployerPhase(string path, CloudStorageAccount account)
-        {
-            // replace UNIX slashes
-            path = path.Replace(@"/", Path.DirectorySeparatorChar.ToString());
-
-            if (!path.EndsWith(Path.DirectorySeparatorChar.ToString()))
-            {
-                path += Path.DirectorySeparatorChar;
-            }
-
-            this.path = path;
-
-            this.client = account.CreateCloudBlobClient();
-        }
+        [Parameter]
+        public string SolutionsDirectory { get; set; }
         
-        public void Run()
+        [Parameter(Required=false)]
+        public string[] Solutions { get; set; }
+        
+        [Parameter("solution storage account connection string", Secure=true)]
+        public string SolutionStorageConnectionString
         {
-            
+            set
+            {
+                CloudStorageAccount account = CloudStorageAccount.Parse(value);
+                this.client = account.CreateCloudBlobClient();
+            }
         }
 
-        public void Deploy()
+        public void Run()
         {
             var blobs = this.GetBlobs();
 
@@ -61,21 +55,38 @@ namespace Microsoft.Ciqs.Saw.Phases
 
                 this.UploadFiles(container, blob.Value);
             }
-
-            
         }
 
         private IDictionary<string, IList<Tuple<string, string>>> GetBlobs()
         {
+            var path = this.SolutionsDirectory;
+            var solutionSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            
+            if (this.Solutions != null)
+            {
+                solutionSet.UnionWith(this.Solutions);
+            }
+            
+            if (!path.EndsWith(Path.DirectorySeparatorChar.ToString()))
+            {
+                path += Path.DirectorySeparatorChar;
+            }
+            
             var result = new Dictionary<string, IList<Tuple<string, string>>>();
             result.Add(Constants.SolutionIndexContainerName, new List<Tuple<string, string>>());
 
             var core = @"\core";
             var assets = @"\assets\";
 
-            foreach (string folder in Directory.GetDirectories(this.path))
+            foreach (string folder in Directory.GetDirectories(path))
             {
-                var solutionName = folder.Remove(0, path.Length);
+                var solutionName = folder.Remove(0, path.Length).ToLower();
+                
+                if (this.Solutions != null && !solutionSet.Contains(solutionName))
+                {
+                    continue;
+                }
+                
                 result.Add(solutionName, new List<Tuple<string, string>>());
 
                 var corePath = folder + core;
@@ -83,7 +94,7 @@ namespace Microsoft.Ciqs.Saw.Phases
 
                 foreach (string file in Directory.EnumerateFiles(corePath, "*", SearchOption.AllDirectories))
                 {
-                    string blobName = file.Remove(0, this.path.Length).Remove(solutionName.Length, core.Length);
+                    string blobName = solutionName + file.Remove(0, path.Length).Remove(0, solutionName.Length + core.Length);                    
                     result[Constants.SolutionIndexContainerName].Add(new Tuple<string, string>(blobName, file));
                 }
 
@@ -107,7 +118,13 @@ namespace Microsoft.Ciqs.Saw.Phases
 
         private void UploadFiles(CloudBlobContainer container, IList<Tuple<string, string>> files)
         {
+            if (files == null || files.Count == 0)
+            {
+                return;
+            }
+            
             Console.WriteLine($"Populating container {container.Name}:");
+            
             foreach (var file in files)
             {
                 CloudBlockBlob blockBlob = container.GetBlockBlobReference(file.Item1);

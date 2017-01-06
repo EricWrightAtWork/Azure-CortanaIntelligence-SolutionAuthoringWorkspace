@@ -1,82 +1,54 @@
 ﻿namespace Microsoft.Ciqs.Saw.Cli
 {
     using System;
-    using System.Collections.Generic;
-    using System.Configuration;
+    using System.Collections.Generic;    
     using System.IO;
     using System.Linq;
     using System.Reflection;
     using Microsoft.Ciqs.Saw.Common;
-    using Microsoft.Ciqs.Saw.Phases;
     using Microsoft.WindowsAzure.Storage;
 
     class Program
     {
-        private static void PrintUsage(bool isInvalid = false)
-        {
-            if (isInvalid)
-            {
-                Console.WriteLine("Invalid command.");
-            }    
-        }
-        
-        private static IEnumerable<Type> GetTypesWith<TAttribute>(bool inherit) 
-                              where TAttribute: Attribute
-        {
-            return from a in Assembly.GetExecutingAssembly().GetReferencedAssemblies()
-                from t in Assembly.Load(a).GetTypes()
-                where t.IsDefined(typeof(TAttribute), inherit)
-                select t;
-        }
-        
         static int Main(string[] args)
-        {    
-            /*     
-            foreach (var t in GetTypesWith<SawPhaseAttribute>(false))
-            {
-                Console.WriteLine(t.Name);
-            }
-            */
-               
+        {
+            var parameterPool = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                {Constants.SolutionsDirectoryParameterName, Constants.SolutionsDirectory},                
+                {Constants.PackagesDirectoryParameterName, Constants.PackagesDirectory},
+                {Constants.SolutionStorageConnectionStringParameterName, Constants.SolutionStorageConnectionString}
+            };
+            
+            InformationPrinter info = new InformationPrinter(parameterPool);   
+            
             if (args.Length == 0)
             {
-                Program.PrintUsage();
+                info.PrintUsage();
+                return 1;
+            }
+            
+            if (args[0].Equals("help", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (args.Length == 2)
+                {
+                    info.PrintCommandDescription(args[1]);
+                }
+                else
+                {
+                    info.PrintAvailableCommands();
+                }
+                
                 return 0;
             }
             
-            var cliArgsParser = new CommandLineArgumentsParser(args);
-       
-            var root = Path.GetFullPath(Environment.GetEnvironmentVariable("SAW_ROOT"));
-            var solutionsRoot = Path.GetFullPath(Path.Combine(root, ConfigurationManager.AppSettings["SolutionsDirectory"]));
+            var clArgsParser = new CommandLineArgumentsParser(args);
+            var command = clArgsParser.Command;            
+            var phaseSequence = PhaseListProvider.GetPhaseSequence(command);
             
-            var command = args[0];
+            clArgsParser.Parameters.ToList().ForEach(p => parameterPool[p.Key] = p.Value);
             
-            Action buildLambda = () => {
-                var packagesDirectory = Path.GetFullPath(Environment.GetEnvironmentVariable("PACKAGES_DIRECTORY"));
-                SolutionBuilderPhase builder = new SolutionBuilderPhase(solutionsRoot, packagesDirectory);
-                builder.Build();                
-            };
+            var phaseSequenceExecutor = new PhaseSequenceExecutor(phaseSequence, parameterPool);            
             
-            Action deployLambda = () => {
-                string storageConnectionString = ConfigurationManager.AppSettings["SolutionStorageConnectionString"];
-                CloudStorageAccount account = CloudStorageAccount.Parse(storageConnectionString);
-                SolutionDeployerPhase deployer = new SolutionDeployerPhase(solutionsRoot, account);
-                deployer.Deploy();                                    
-            };
-            
-            switch (cliArgsParser.Command)
-            {
-                case "build":
-                    buildLambda();
-                    break;
-                case "deploy":
-                    buildLambda();
-                    deployLambda();
-                    break;
-                default:
-                    Program.PrintUsage(true);
-                    return 1;
-            }
+            phaseSequenceExecutor.Run();
             
             return 0;
         }
